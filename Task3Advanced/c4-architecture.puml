@@ -1,0 +1,78 @@
+@startuml
+title Будущее 2.0. Целевая C4-диаграмма
+
+top to bottom direction
+
+!includeurl https://raw.githubusercontent.com/RicardoNiepel/C4-PlantUML/master/C4_Component.puml
+
+Person(business_user, "Бизнес-пользователь", "Строит отчёты в портале самообслуживания")
+Person(data_engineer, "Инженер данных", "Готовит и описывает наборы данных")
+Person(security_officer, "Специалист ИБ", "Настраивает доступ и проверяет аудит")
+
+System_Ext(current_sources, "Текущие источники", "Клиники и финтех-сервисы")
+System_Ext(new_sources, "Новые источники", "ИИ-сервисы, фарма-партнёры и медоборудование")
+System_Ext(regulators, "Регуляторы", "Медицинские и финансовые требования")
+
+System_Boundary(future, "Целевая платформа Будущее 2.0") {
+  Container(portal, "Портал самообслуживания", "Web UI", "Каталог данных и конструктор отчётов")
+  Container(iam, "IAM и аудит", "IAM, RBAC", "Роли, права доступа и журналы действий")
+
+  Container_Boundary(domains, "Бизнес-домены") {
+    Container(medical_domain, "Медицинский домен", "Services", "Записи на приём, пациентский поток и агрегированные результаты ИИ")
+    Container(finance_domain, "Финансовый домен", "Go, Java services", "Счета, кредиты и инвойсы")
+    Container(new_domain, "Домен новых направлений", "Services", "Фарма-партнёры и медоборудование")
+  }
+
+  Container(event_platform, "Платформа событий", "Kafka-compatible broker", "Доменные события, проверка схем и очередь ошибок")
+  Container(ingestion, "Загрузка данных", "Connectors, CDC", "Batch-загрузки, CDC и данные партнёров")
+
+  Container_Boundary(data_platform, "Платформа данных") {
+    Container(storage, "Хранилище данных", "S3 + Data Lakehouse", "Исходные данные и аналитические таблицы")
+    Container(catalog, "Каталог данных", "Metadata catalog", "Описание наборов данных, владельцы и качество")
+    Container(bi, "BI и семантический слой", "SQL engine, BI", "Единые метрики и витрины для отчётов")
+
+    Component(report_builder, "Конструктор отчётов", "Web component", "Собирает отчёт из доступных наборов")
+    Component(query_service, "Сервис запросов", "Service", "Выполняет аналитические запросы")
+    Component(access_checker, "Проверка доступа", "Service", "Проверяет роль и чувствительность данных")
+    Component(data_loader, "Загрузчик данных", "Service", "Загружает события, batch и CDC в хранилище")
+  }
+
+  Container(observability, "Мониторинг и аудит", "Logs, metrics", "Метрики, ошибки и данные для проверок")
+
+  Container_Boundary(legacy, "Легаси на время миграции") {
+    Container(old_dwh, "Старое DWH", "SQL Server 2008", "Временный источник только для чтения")
+    Container(old_esb, "Старая ESB", "Apache Camel", "Временный мост для старых интеграций")
+  }
+}
+
+Rel(business_user, portal, "Строит отчёты")
+Rel(data_engineer, catalog, "Описывает наборы данных")
+Rel(security_officer, iam, "Настраивает правила доступа")
+
+Rel(current_sources, medical_domain, "Передают медицинские события")
+Rel(current_sources, finance_domain, "Передают финансовые события")
+Rel(new_sources, new_domain, "Передают данные новых направлений")
+
+Rel(medical_domain, event_platform, "Публикует события")
+Rel(finance_domain, event_platform, "Публикует события")
+Rel(new_domain, event_platform, "Публикует события")
+Rel(event_platform, data_loader, "Передаёт события")
+Rel(old_dwh, ingestion, "Передаёт CDC и batch-данные")
+Rel(old_esb, ingestion, "Передаёт старые интеграции")
+Rel(ingestion, data_loader, "Передаёт данные")
+Rel(data_loader, storage, "Записывает данные")
+Rel(storage, catalog, "Регистрирует метаданные")
+Rel(storage, bi, "Предоставляет витрины")
+
+Rel(portal, catalog, "Показывает каталог")
+Rel(portal, report_builder, "Открывает конструктор")
+Rel(report_builder, query_service, "Запускает запрос")
+Rel(query_service, access_checker, "Проверяет права")
+Rel(access_checker, iam, "Читает политики")
+Rel(query_service, bi, "Читает разрешённые витрины")
+
+Rel(iam, observability, "Передаёт журналы")
+Rel(event_platform, observability, "Передаёт метрики потоков")
+Rel(bi, observability, "Передаёт метрики отчётов")
+Rel(observability, regulators, "Даёт данные для проверок")
+@enduml

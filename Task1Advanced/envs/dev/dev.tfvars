@@ -1,0 +1,12 @@
+cloud_id            = "replace-with-cloud-id"
+folder_id           = "replace-with-folder-id"
+zone                = "ru-central1-a"
+vm_name             = "future-dev-vm"
+cores               = 2
+memory              = 2
+disk_size           = 20
+disk_type           = "network-hdd"
+subnet_id           = "replace-with-dev-subnet-id"
+ssh_public_key_path = "~/.ssh/id_rsa.pub"
+ssh_user            = "ubuntu"
+nat                 = true

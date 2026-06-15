@@ -1,0 +1,12 @@
+cloud_id            = "replace-with-cloud-id"
+folder_id           = "replace-with-folder-id"
+zone                = "ru-central1-a"
+vm_name             = "future-prod-vm"
+cores               = 8
+memory              = 16
+disk_size           = 100
+disk_type           = "network-ssd"
+subnet_id           = "replace-with-prod-subnet-id"
+ssh_public_key_path = "~/.ssh/id_rsa.pub"
+ssh_user            = "ubuntu"
+nat                 = false
