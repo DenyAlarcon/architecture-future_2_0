@@ -79,13 +79,16 @@ Pipeline находится в `.github/workflows/task2-terraform.yml`.
 
 Он выполняет:
 
-- `terraform init`;
+- в pull request: `terraform init -backend=false`, `terraform fmt`, `terraform validate`;
+- вне pull request: `terraform init` с удалённым backend;
 - `terraform fmt`;
 - `terraform validate`;
-- `terraform plan`;
+- `terraform plan` только вне pull request, когда доступны GitHub Secrets и Variables;
 - `terraform apply` только вручную через `workflow_dispatch` с параметром `action=apply`.
 
 Для дополнительного контроля `apply` привязан к GitHub Environment `production`. В настройках репозитория можно включить обязательное approval для этого environment.
+
+В pull request секреты могут быть недоступны, поэтому удалённый backend и `terraform plan` там не запускаются. Это позволяет проверить код Terraform без передачи облачных ключей в PR.
 
 ## Secrets
 

@@ -47,6 +47,10 @@ env:
   TF_VAR_nat: ${{ vars.TF_VM_NAT }}
   AWS_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+  TF_BACKEND_BUCKET: ${{ vars.TF_BACKEND_BUCKET }}
+  TF_BACKEND_KEY: ${{ vars.TF_BACKEND_KEY }}
+  TF_BACKEND_REGION: ${{ vars.TF_BACKEND_REGION }}
+  TF_BACKEND_ENDPOINT: ${{ vars.TF_BACKEND_ENDPOINT }}
 
 jobs:
   plan:
@@ -65,15 +69,55 @@ jobs:
         with:
           terraform_version: 1.15.6
 
+      - name: Terraform init without backend
+        if: github.event_name == 'pull_request'
+        run: terraform init -backend=false
+
+      - name: Check required variables
+        if: github.event_name != 'pull_request'
+        run: |
+          missing=0
+          required_vars=(
+            TF_BACKEND_BUCKET
+            TF_BACKEND_KEY
+            TF_BACKEND_REGION
+            TF_BACKEND_ENDPOINT
+            TF_VAR_yc_token
+            TF_VAR_cloud_id
+            TF_VAR_folder_id
+            TF_VAR_zone
+            TF_VAR_vm_name
+            TF_VAR_cores
+            TF_VAR_memory
+            TF_VAR_disk_size
+            TF_VAR_disk_type
+            TF_VAR_subnet_id
+            TF_VAR_ssh_public_key
+            TF_VAR_ssh_user
+            TF_VAR_nat
+            AWS_ACCESS_KEY_ID
+            AWS_SECRET_ACCESS_KEY
+          )
+
+          for name in "${required_vars[@]}"; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is not set"
+              missing=1
+            fi
+          done
+
+          exit "$missing"
+
       - name: Create backend config
+        if: github.event_name != 'pull_request'
         run: |
           cat > backend.hcl <<EOF
-          bucket = "${{ vars.TF_BACKEND_BUCKET }}"
-          key    = "${{ vars.TF_BACKEND_KEY }}"
-          region = "${{ vars.TF_BACKEND_REGION }}"
+          bucket = "${TF_BACKEND_BUCKET}"
+          key    = "${TF_BACKEND_KEY}"
+          region = "${TF_BACKEND_REGION}"
 
           endpoints = {
-            s3 = "${{ vars.TF_BACKEND_ENDPOINT }}"
+            s3 = "${TF_BACKEND_ENDPOINT}"
           }
 
           skip_credentials_validation = true
@@ -84,6 +128,7 @@ jobs:
           EOF
 
       - name: Terraform init
+        if: github.event_name != 'pull_request'
         run: terraform init -backend-config=backend.hcl
 
       - name: Terraform fmt
@@ -93,6 +138,7 @@ jobs:
         run: terraform validate
 
       - name: Terraform plan
+        if: github.event_name != 'pull_request'
         run: terraform plan -out=tfplan
 
   apply:
@@ -114,15 +160,49 @@ jobs:
         with:
           terraform_version: 1.15.6
 
+      - name: Check required variables
+        run: |
+          missing=0
+          required_vars=(
+            TF_BACKEND_BUCKET
+            TF_BACKEND_KEY
+            TF_BACKEND_REGION
+            TF_BACKEND_ENDPOINT
+            TF_VAR_yc_token
+            TF_VAR_cloud_id
+            TF_VAR_folder_id
+            TF_VAR_zone
+            TF_VAR_vm_name
+            TF_VAR_cores
+            TF_VAR_memory
+            TF_VAR_disk_size
+            TF_VAR_disk_type
+            TF_VAR_subnet_id
+            TF_VAR_ssh_public_key
+            TF_VAR_ssh_user
+            TF_VAR_nat
+            AWS_ACCESS_KEY_ID
+            AWS_SECRET_ACCESS_KEY
+          )
+
+          for name in "${required_vars[@]}"; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is not set"
+              missing=1
+            fi
+          done
+
+          exit "$missing"
+
       - name: Create backend config
         run: |
           cat > backend.hcl <<EOF
-          bucket = "${{ vars.TF_BACKEND_BUCKET }}"
-          key    = "${{ vars.TF_BACKEND_KEY }}"
-          region = "${{ vars.TF_BACKEND_REGION }}"
+          bucket = "${TF_BACKEND_BUCKET}"
+          key    = "${TF_BACKEND_KEY}"
+          region = "${TF_BACKEND_REGION}"
 
           endpoints = {
-            s3 = "${{ vars.TF_BACKEND_ENDPOINT }}"
+            s3 = "${TF_BACKEND_ENDPOINT}"
           }
 
           skip_credentials_validation = true
