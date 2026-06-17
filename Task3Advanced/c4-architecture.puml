@@ -1,0 +1,90 @@
+@startuml
+title Будущее 2.0. Целевая C4-диаграмма
+
+top to bottom direction
+
+!includeurl https://raw.githubusercontent.com/RicardoNiepel/C4-PlantUML/master/C4_Component.puml
+
+Person(business_user, "Бизнес-пользователь", "Строит отчёты в портале самообслуживания")
+Person(data_engineer, "Инженер данных", "Готовит и описывает наборы данных")
+Person(security_officer, "Специалист ИБ", "Настраивает доступ и проверяет аудит")
+
+System_Ext(current_sources, "Текущие источники", "Клиники, финтех-сервисы и ИИ-сервисы")
+System_Ext(new_sources, "Новые источники", "Фарма-партнёры и медоборудование")
+System_Ext(regulators, "Регуляторы", "Медицинские и финансовые требования")
+
+System_Boundary(future, "Целевая платформа Будущее 2.0") {
+  Container(portal, "Портал самообслуживания", "Web UI", "Каталог данных и конструктор отчётов")
+  Container(iam, "IAM и аудит", "IAM, RBAC", "Роли, права доступа и журналы действий")
+
+  Container_Boundary(domains, "Бизнес-домены") {
+    Container(medical_domain, "Медицинский домен", "Services", "Записи на приём, пациентский поток и медицинская бизнес-логика")
+    Container(finance_domain, "Финансовый домен", "Go, Java services", "Счета, кредиты, платежи и финансовая бизнес-логика")
+    Container(new_domain, "Домен новых направлений", "Services", "Фарма-партнёры, медоборудование и правила новых направлений")
+  }
+
+  Container(event_platform, "Платформа событий", "Kafka-compatible broker", "Доменные события, маршрутизация, ретраи и очередь ошибок")
+  Container(ingestion, "Загрузка данных", "Services", "Пакетные загрузки и изменения из старых систем")
+
+  Container_Boundary(integration, "Сервисы интеграции без бизнес-логики") {
+    Component(event_rules, "ФЛК и маршрутизация", "Service", "Проверяет обязательные поля, схему события и выбирает маршрут")
+    Component(stream_transformer, "Потоковые трансформации", "Service", "Преобразует события перед загрузкой в аналитику")
+    Component(batch_transformer, "Пакетные трансформации", "Service", "Преобразует пакетные данные и изменения из старых систем")
+  }
+
+  Container_Boundary(data_platform, "Платформа данных") {
+    Container(storage, "Хранилище данных", "S3 + Data Lakehouse", "Исходные данные и аналитические таблицы")
+    Container(catalog, "Каталог данных", "Metadata catalog", "Описание наборов данных, владельцы и качество")
+    Container(bi, "BI и семантический слой", "SQL engine, BI", "Единые метрики и витрины для отчётов")
+
+    Component(report_builder, "Конструктор отчётов", "Web component", "Собирает отчёт из доступных наборов")
+    Component(query_service, "Сервис запросов", "Service", "Выполняет аналитические запросы")
+    Component(access_checker, "Проверка доступа", "Service", "Проверяет роль и чувствительность данных")
+    Component(data_loader, "Загрузчик данных", "Service", "Загружает события и пакетные данные в хранилище")
+    Component(quality_checker, "Проверка качества данных", "Service", "Проверяет полноту, свежесть и правила перед публикацией витрин")
+  }
+
+  Container(observability, "Мониторинг и аудит", "Logs, metrics", "Метрики, ошибки и данные для проверок")
+
+  Container_Boundary(legacy, "Легаси на время миграции") {
+    Container(old_dwh, "Старое DWH", "SQL Server 2008", "Временный источник только для чтения")
+    Container(old_esb, "Старая ESB", "Apache Camel", "Временный мост для старых интеграций")
+  }
+}
+
+Rel(business_user, portal, "Строит отчёты")
+Rel(data_engineer, catalog, "Описывает наборы данных")
+Rel(security_officer, iam, "Настраивает правила доступа")
+
+Rel(current_sources, medical_domain, "Передают медицинские события")
+Rel(current_sources, finance_domain, "Передают финансовые события")
+Rel(new_sources, new_domain, "Передают данные новых направлений")
+
+Rel(medical_domain, event_rules, "Публикует события")
+Rel(finance_domain, event_rules, "Публикует события")
+Rel(new_domain, event_rules, "Публикует события")
+Rel(event_rules, event_platform, "Проверяет, маршрутизирует и отправляет ошибки")
+Rel(event_platform, stream_transformer, "Передаёт события")
+Rel(stream_transformer, data_loader, "Передаёт обработанные события")
+Rel(old_dwh, ingestion, "Передаёт изменения и пакетные данные")
+Rel(old_esb, ingestion, "Передаёт старые интеграции на время миграции")
+Rel(ingestion, batch_transformer, "Передаёт пакетные данные")
+Rel(batch_transformer, data_loader, "Передаёт подготовленные данные")
+Rel(data_loader, storage, "Записывает данные")
+Rel(data_loader, quality_checker, "Передаёт данные на проверку")
+Rel(quality_checker, catalog, "Публикует статус качества")
+Rel(storage, catalog, "Регистрирует метаданные")
+Rel(storage, bi, "Предоставляет витрины")
+
+Rel(portal, catalog, "Показывает каталог")
+Rel(portal, report_builder, "Открывает конструктор")
+Rel(report_builder, query_service, "Запускает запрос")
+Rel(query_service, access_checker, "Проверяет права")
+Rel(access_checker, iam, "Читает политики")
+Rel(query_service, bi, "Читает разрешённые витрины")
+
+Rel(iam, observability, "Передаёт журналы")
+Rel(event_platform, observability, "Передаёт метрики потоков")
+Rel(bi, observability, "Передаёт метрики отчётов")
+Rel(observability, regulators, "Даёт данные для проверок")
+@enduml
