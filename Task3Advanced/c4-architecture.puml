@@ -9,8 +9,8 @@ Person(business_user, "Бизнес-пользователь", "Строит о�
 Person(data_engineer, "Инженер данных", "Готовит и описывает наборы данных")
 Person(security_officer, "Специалист ИБ", "Настраивает доступ и проверяет аудит")
 
-System_Ext(current_sources, "Текущие источники", "Клиники и финтех-сервисы")
-System_Ext(new_sources, "Новые источники", "ИИ-сервисы, фарма-партнёры и медоборудование")
+System_Ext(current_sources, "Текущие источники", "Клиники, финтех-сервисы и ИИ-сервисы")
+System_Ext(new_sources, "Новые источники", "Фарма-партнёры и медоборудование")
 System_Ext(regulators, "Регуляторы", "Медицинские и финансовые требования")
 
 System_Boundary(future, "Целевая платформа Будущее 2.0") {
@@ -18,13 +18,19 @@ System_Boundary(future, "Целевая платформа Будущее 2.0") 
   Container(iam, "IAM и аудит", "IAM, RBAC", "Роли, права доступа и журналы действий")
 
   Container_Boundary(domains, "Бизнес-домены") {
-    Container(medical_domain, "Медицинский домен", "Services", "Записи на приём, пациентский поток и агрегированные результаты ИИ")
-    Container(finance_domain, "Финансовый домен", "Go, Java services", "Счета, кредиты и инвойсы")
-    Container(new_domain, "Домен новых направлений", "Services", "Фарма-партнёры и медоборудование")
+    Container(medical_domain, "Медицинский домен", "Services", "Записи на приём, пациентский поток и медицинская бизнес-логика")
+    Container(finance_domain, "Финансовый домен", "Go, Java services", "Счета, кредиты, платежи и финансовая бизнес-логика")
+    Container(new_domain, "Домен новых направлений", "Services", "Фарма-партнёры, медоборудование и правила новых направлений")
   }
 
-  Container(event_platform, "Платформа событий", "Kafka-compatible broker", "Доменные события, проверка схем и очередь ошибок")
-  Container(ingestion, "Загрузка данных", "Connectors, CDC", "Batch-загрузки, CDC и данные партнёров")
+  Container(event_platform, "Платформа событий", "Kafka-compatible broker", "Доменные события, маршрутизация, ретраи и очередь ошибок")
+  Container(ingestion, "Загрузка данных", "Services", "Пакетные загрузки и изменения из старых систем")
+
+  Container_Boundary(integration, "Сервисы интеграции без бизнес-логики") {
+    Component(event_rules, "ФЛК и маршрутизация", "Service", "Проверяет обязательные поля, схему события и выбирает маршрут")
+    Component(stream_transformer, "Потоковые трансформации", "Service", "Преобразует события перед загрузкой в аналитику")
+    Component(batch_transformer, "Пакетные трансформации", "Service", "Преобразует пакетные данные и изменения из старых систем")
+  }
 
   Container_Boundary(data_platform, "Платформа данных") {
     Container(storage, "Хранилище данных", "S3 + Data Lakehouse", "Исходные данные и аналитические таблицы")
@@ -34,7 +40,8 @@ System_Boundary(future, "Целевая платформа Будущее 2.0") 
     Component(report_builder, "Конструктор отчётов", "Web component", "Собирает отчёт из доступных наборов")
     Component(query_service, "Сервис запросов", "Service", "Выполняет аналитические запросы")
     Component(access_checker, "Проверка доступа", "Service", "Проверяет роль и чувствительность данных")
-    Component(data_loader, "Загрузчик данных", "Service", "Загружает события, batch и CDC в хранилище")
+    Component(data_loader, "Загрузчик данных", "Service", "Загружает события и пакетные данные в хранилище")
+    Component(quality_checker, "Проверка качества данных", "Service", "Проверяет полноту, свежесть и правила перед публикацией витрин")
   }
 
   Container(observability, "Мониторинг и аудит", "Logs, metrics", "Метрики, ошибки и данные для проверок")
@@ -53,14 +60,19 @@ Rel(current_sources, medical_domain, "Передают медицинские с
 Rel(current_sources, finance_domain, "Передают финансовые события")
 Rel(new_sources, new_domain, "Передают данные новых направлений")
 
-Rel(medical_domain, event_platform, "Публикует события")
-Rel(finance_domain, event_platform, "Публикует события")
-Rel(new_domain, event_platform, "Публикует события")
-Rel(event_platform, data_loader, "Передаёт события")
-Rel(old_dwh, ingestion, "Передаёт CDC и batch-данные")
-Rel(old_esb, ingestion, "Передаёт старые интеграции")
-Rel(ingestion, data_loader, "Передаёт данные")
+Rel(medical_domain, event_rules, "Публикует события")
+Rel(finance_domain, event_rules, "Публикует события")
+Rel(new_domain, event_rules, "Публикует события")
+Rel(event_rules, event_platform, "Проверяет, маршрутизирует и отправляет ошибки")
+Rel(event_platform, stream_transformer, "Передаёт события")
+Rel(stream_transformer, data_loader, "Передаёт обработанные события")
+Rel(old_dwh, ingestion, "Передаёт изменения и пакетные данные")
+Rel(old_esb, ingestion, "Передаёт старые интеграции на время миграции")
+Rel(ingestion, batch_transformer, "Передаёт пакетные данные")
+Rel(batch_transformer, data_loader, "Передаёт подготовленные данные")
 Rel(data_loader, storage, "Записывает данные")
+Rel(data_loader, quality_checker, "Передаёт данные на проверку")
+Rel(quality_checker, catalog, "Публикует статус качества")
 Rel(storage, catalog, "Регистрирует метаданные")
 Rel(storage, bi, "Предоставляет витрины")
 
